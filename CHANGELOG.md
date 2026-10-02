@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - `web_search` accepts `provider`, `queries`, and `domainFilter` arrays that a model sent as a JSON string, such as `provider: "[\"parallel-mcp\"]"`. They failed schema validation before the search ran. Thanks to [@advaitpaliwal](https://github.com/advaitpaliwal) for [PR #491](https://github.com/nicobailon/pi-web-access/pull/491).
+- `get_search_content` reads a fetched page without `url` or `urlIndex` when the stored fetch holds only one page. Before, calls like `{ responseId, findText }` failed with "No URL specified" and the model had to retry with `urlIndex: 0`. Thanks to [@j-koester](https://github.com/j-koester) for [PR #494](https://github.com/nicobailon/pi-web-access/pull/494).
 
 ## [0.35.0] - 2026-09-30
 
