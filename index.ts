@@ -3107,6 +3107,11 @@ export default function (pi: ExtensionAPI) {
 							details: { error: "Index out of range" },
 						};
 					}
+				} else if (data.urls.length === 1) {
+					// Single stored URL: default to it so calls that omit url and urlIndex
+					// (common with findText on single-URL fetches) succeed without a retry.
+					selectedUrlIndex = 0;
+					urlData = data.urls[0];
 				} else {
 					const available = data.urls.map((u, i) => `${i}: ${u.url}`).join("\n  ");
 					return {

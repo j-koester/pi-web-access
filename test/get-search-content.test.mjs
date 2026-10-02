@@ -166,6 +166,40 @@ test("get_search_content rejects unsafe fetched content ranges", async () => {
 	assert.match(researchFind.content[0].text, /Unique bridge research summary marker/);
 });
 
+test("get_search_content defaults to the only stored URL when url and urlIndex are omitted", async () => {
+	const tool = getContentTool();
+	storeFetchedContent("short content with a unique needle");
+
+	const findResult = await tool.execute("call", { responseId: "large-fetch", findText: "needle" });
+	assert.equal(findResult.details.error, undefined);
+	assert.equal(findResult.details.url, "https://example.com/large");
+	assert.match(findResult.content[0].text, /needle/);
+
+	const sliceResult = await tool.execute("call", { responseId: "large-fetch" });
+	assert.equal(sliceResult.details.error, undefined);
+	assert.equal(sliceResult.details.url, "https://example.com/large");
+	assert.match(sliceResult.content[0].text, /short content with a unique needle/);
+});
+
+test("get_search_content still asks for a URL when multiple stored URLs exist", async () => {
+	const tool = getContentTool();
+	storeResult("multi-fetch", {
+		id: "multi-fetch",
+		type: "fetch",
+		timestamp: Date.now(),
+		urls: [
+			{ url: "https://example.com/first", title: "First", content: "first content", error: null },
+			{ url: "https://example.com/second", title: "Second", content: "second content", error: null },
+		],
+	});
+
+	const result = await tool.execute("call", { responseId: "multi-fetch" });
+	assert.equal(result.details.error, "No URL specified");
+	assert.match(result.content[0].text, /Specify url or urlIndex/);
+	assert.match(result.content[0].text, /0: https:\/\/example\.com\/first/);
+	assert.match(result.content[0].text, /1: https:\/\/example\.com\/second/);
+});
+
 test("get_search_content normalizes bridge defaults for search matches", async () => {
 	const tool = getContentTool();
 	storeSearchContent();
