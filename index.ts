@@ -5,6 +5,7 @@ import pLimit from "p-limit";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai/compat";
 import type { ExtractedContent, ExtractOptions } from "./extract.ts";
 import { normalizeFetchContentParams } from "./fetch-params.ts";
+import { errorResult } from "./error-result.ts";
 import { resolveAuthFetchProfile, type AuthFetchProfile } from "./auth-fetch.ts";
 import { findContent, type FindMode } from "./content-find.ts";
 import { answerFromPage } from "./page-query.ts";
@@ -1875,17 +1876,11 @@ export default function (pi: ExtensionAPI) {
 				const recencyFilter = normalizeRecencyFilter(params.recencyFilter);
 
 				if (queryList.length === 0) {
-					return {
-						content: [{ type: "text", text: "Error: No query provided. Use 'query' or 'queries' parameter." }],
-						details: { error: "No query provided" },
-					};
+					return errorResult("Error: No query provided. Use 'query' or 'queries' parameter.", { error: "No query provided" });
 				}
 
 				if (shouldCurate && !ctx) {
-					return {
-						content: [{ type: "text", text: "Error: Curation requires an active extension context." }],
-						details: { error: "Missing extension context" },
-					};
+					return errorResult("Error: Curation requires an active extension context.", { error: "Missing extension context" });
 				}
 
 				if (shouldCurate) {
@@ -2136,10 +2131,7 @@ export default function (pi: ExtensionAPI) {
 			let summaryMeta: SummaryMeta | undefined;
 			if (workflow === "auto-summary") {
 				if (!ctx) {
-					return {
-						content: [{ type: "text", text: "Error: Auto-summary requires an active extension context." }],
-						details: { error: "Missing extension context" },
-					};
+					return errorResult("Error: Auto-summary requires an active extension context.", { error: "Missing extension context" });
 				}
 				onUpdate?.({
 					content: [{ type: "text", text: "Generating summary..." }],
@@ -2455,7 +2447,7 @@ export default function (pi: ExtensionAPI) {
 			return runWithProxy(typeof params.proxy === "string" ? params.proxy : undefined, async () => {
 				const claim = typeof params.claim === "string" ? params.claim.trim() : "";
 				if (!claim) {
-					return { content: [{ type: "text", text: "Error: 'claim' is required." }], details: { error: "Missing claim" } };
+					return errorResult("Error: 'claim' is required.", { error: "Missing claim" });
 				}
 
 				const requestedQueries = Array.isArray(params.queries)
@@ -2583,29 +2575,29 @@ export default function (pi: ExtensionAPI) {
 				normalized = normalizeFetchContentParams(params);
 			} catch (err) {
 				const error = err instanceof Error ? err.message : String(err);
-				return { content: [{ type: "text", text: `Error: ${error}` }], details: { error } };
+				return errorResult(`Error: ${error}`, { error });
 			}
 			const { urlList, options } = normalized;
 			const mode = options.mode ?? fetchModeConfig.defaultMode;
 			if (!fetchModeConfig.allowedModes.includes(mode)) {
 				const error = `Fetch mode "${mode}" is disabled by fetch.allowedModes.`;
-				return { content: [{ type: "text", text: `Error: ${error}` }], details: { error } };
+				return errorResult(`Error: ${error}`, { error });
 			}
 			return runWithProxy(options.proxy, async () => {
 				if (mode === "answer" && !options.prompt) {
-					return { content: [{ type: "text", text: "Error: mode answer requires prompt." }], details: { error: "mode answer requires prompt" } };
+					return errorResult("Error: mode answer requires prompt.", { error: "mode answer requires prompt" });
 				}
 				if (mode === "raw" && (options.forceClone === true || options.timestamp || options.frames || options.prompt || options.model || options.answerModel)) {
-					return { content: [{ type: "text", text: "Error: mode raw cannot be combined with forceClone, prompt, timestamp, frames, model, or answerModel." }], details: { error: "Incompatible raw mode options" } };
+					return errorResult("Error: mode raw cannot be combined with forceClone, prompt, timestamp, frames, model, or answerModel.", { error: "Incompatible raw mode options" });
 				}
 				if (mode !== "answer" && options.answerModel) {
-					return { content: [{ type: "text", text: "Error: answerModel requires mode answer." }], details: { error: "answerModel requires mode answer" } };
+					return errorResult("Error: answerModel requires mode answer.", { error: "answerModel requires mode answer" });
 				}
 				if (mode === "answer" && options.model) {
-					return { content: [{ type: "text", text: "Error: use answerModel, not model, with mode answer." }], details: { error: "model is incompatible with mode answer" } };
+					return errorResult("Error: use answerModel, not model, with mode answer.", { error: "model is incompatible with mode answer" });
 				}
 				if (mode === "answer" && options.auth !== undefined) {
-					return { content: [{ type: "text", text: "Error: auth cannot be combined with mode answer." }], details: { error: "auth cannot be combined with mode answer" } };
+					return errorResult("Error: auth cannot be combined with mode answer.", { error: "auth cannot be combined with mode answer" });
 				}
 				let authFetchProfile: AuthFetchProfile | undefined;
 				if (options.auth !== undefined) {
@@ -2613,14 +2605,11 @@ export default function (pi: ExtensionAPI) {
 						authFetchProfile = resolveAuthFetchProfile(options.auth);
 					} catch (err) {
 						const error = err instanceof Error ? err.message : String(err);
-						return { content: [{ type: "text", text: `Error: ${error}` }], details: { error } };
+						return errorResult(`Error: ${error}`, { error });
 					}
 				}
 				if (urlList.length === 0) {
-					return {
-						content: [{ type: "text", text: "Error: No URL provided." }],
-						details: { error: "No URL provided" },
-					};
+					return errorResult("Error: No URL provided. Use the 'url' parameter, or 'urls' for parallel fetches.", { error: "No URL provided" });
 				}
 
 				onUpdate?.({
@@ -2669,10 +2658,7 @@ export default function (pi: ExtensionAPI) {
 				if (urlList.length === 1) {
 					const result = presentedResults[0];
 					if (result.error) {
-						return {
-							content: [{ type: "text", text: `Error: ${result.error}` }],
-							details: { urls: urlList, urlCount: 1, successful: 0, error: result.error, ...(storedContent ? { responseId } : {}), prompt: params.prompt, timestamp: params.timestamp, frames: params.frames },
-						};
+						return errorResult(`Error: ${result.error}`, { urls: urlList, urlCount: 1, successful: 0, error: result.error, ...(storedContent ? { responseId } : {}), prompt: params.prompt, timestamp: params.timestamp, frames: params.frames });
 					}
 
 					const fullLength = result.content.length;
@@ -2912,26 +2898,17 @@ export default function (pi: ExtensionAPI) {
 		async execute(_toolCallId, rawParams): Promise<AgentToolResult<Record<string, unknown>>> {
 			const params = normalizeGetSearchContentParams(rawParams);
 			if (params.findMode !== undefined && params.findText === undefined) {
-				return {
-					content: [{ type: "text", text: `findMode ${formatInputValue(params.findMode)} requires findText; provide findText or omit findMode.` }],
-					details: { error: "findMode requires findText" },
-				};
+				return errorResult(`findMode ${formatInputValue(params.findMode)} requires findText; provide findText or omit findMode.`, { error: "findMode requires findText" });
 			}
 			const data = getResult(params.responseId);
 			if (!data) {
-				return {
-					content: [{ type: "text", text: `Error: No stored results for responseId ${formatInputValue(params.responseId)}. Use a responseId returned by ${storedContentSources}.` }],
-					details: { error: "Not found", responseId: params.responseId },
-				};
+				return errorResult(`Error: No stored results for responseId ${formatInputValue(params.responseId)}. Use a responseId returned by ${storedContentSources}.`, { error: "Not found", responseId: params.responseId });
 			}
 
 			if (data.type === "research") {
 				const artifact = getResearchArtifact(params.responseId);
 				if (!artifact) {
-					return {
-						content: [{ type: "text", text: `Error: stored research artifact for responseId ${formatInputValue(params.responseId)} was not found. Use a responseId returned by ${storedContentSources}.` }],
-						details: { error: "Artifact not found", responseId: params.responseId },
-					};
+					return errorResult(`Error: stored research artifact for responseId ${formatInputValue(params.responseId)} was not found. Use a responseId returned by ${storedContentSources}.`, { error: "Artifact not found", responseId: params.responseId });
 				}
 				const serialized = JSON.stringify(artifact, null, 2);
 				if (params.findText !== undefined) {
@@ -2944,31 +2921,19 @@ export default function (pi: ExtensionAPI) {
 						};
 					} catch (err) {
 						const error = err instanceof Error ? err.message : String(err);
-						return {
-							content: [{ type: "text", text: `Unable to find ${formatInputValue(params.findText)} in research artifact for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.` }],
-							details: { error, responseId: params.responseId, type: "research" },
-						};
+						return errorResult(`Unable to find ${formatInputValue(params.findText)} in research artifact for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.`, { error, responseId: params.responseId, type: "research" });
 					}
 				}
 				const offset = params.offset ?? 0;
 				const limit = params.limit ?? maxInlineContentChars;
 				if (!Number.isInteger(offset) || offset < 0) {
-					return {
-						content: [{ type: "text", text: `Invalid offset: received ${formatInputValue(offset)} for responseId ${formatInputValue(params.responseId)}; offset must be a non-negative integer. Use 0 or a larger integer.` }],
-						details: { error: "Invalid offset", offset },
-					};
+					return errorResult(`Invalid offset: received ${formatInputValue(offset)} for responseId ${formatInputValue(params.responseId)}; offset must be a non-negative integer. Use 0 or a larger integer.`, { error: "Invalid offset", offset });
 				}
 				if (!Number.isInteger(limit) || limit <= 0 || limit > maxInlineContentChars) {
-					return {
-						content: [{ type: "text", text: `Invalid limit: received ${formatInputValue(limit)} for responseId ${formatInputValue(params.responseId)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.` }],
-						details: { error: "Invalid limit", limit, maxLimit: maxInlineContentChars },
-					};
+					return errorResult(`Invalid limit: received ${formatInputValue(limit)} for responseId ${formatInputValue(params.responseId)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.`, { error: "Invalid limit", limit, maxLimit: maxInlineContentChars });
 				}
 				if (offset > serialized.length) {
-					return {
-						content: [{ type: "text", text: `Offset ${offset} is out of range for responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${serialized.length}. Use an offset within that range.` }],
-						details: { error: "Offset out of range", offset, contentLength: serialized.length },
-					};
+					return errorResult(`Offset ${offset} is out of range for responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${serialized.length}. Use an offset within that range.`, { error: "Offset out of range", offset, contentLength: serialized.length });
 				}
 				const endOffset = Math.min(offset + limit, serialized.length);
 				const artifactSlice = serialized.slice(offset, endOffset);
@@ -2986,33 +2951,21 @@ export default function (pi: ExtensionAPI) {
 					queryData = data.queries.find((q) => q.query === params.query);
 					if (!queryData) {
 						const available = data.queries.map((q) => `"${q.query}"`).join(", ");
-						return {
-							content: [{ type: "text", text: `Query ${formatInputValue(params.query)} was not found for responseId ${formatInputValue(params.responseId)}. Received query=${formatInputValue(params.query)}. Available queries: ${available || "none"}. Use one of the available queries or queryIndex.` }],
-							details: { error: "Query not found" },
-						};
+						return errorResult(`Query ${formatInputValue(params.query)} was not found for responseId ${formatInputValue(params.responseId)}. Received query=${formatInputValue(params.query)}. Available queries: ${available || "none"}. Use one of the available queries or queryIndex.`, { error: "Query not found" });
 					}
 				} else if (params.queryIndex !== undefined) {
 					queryData = data.queries[params.queryIndex];
 					if (!queryData) {
 						const available = data.queries.map((q, i) => `${i}: "${q.query}"`).join(", ");
-						return {
-							content: [{ type: "text", text: `Query index ${formatInputValue(params.queryIndex)} is out of range for responseId ${formatInputValue(params.responseId)}. Received queryIndex=${formatInputValue(params.queryIndex)}; valid indexes are 0-${data.queries.length - 1}. Available queries: ${available || "none"}. Use one of the available indexes.` }],
-							details: { error: "Index out of range" },
-						};
+						return errorResult(`Query index ${formatInputValue(params.queryIndex)} is out of range for responseId ${formatInputValue(params.responseId)}. Received queryIndex=${formatInputValue(params.queryIndex)}; valid indexes are 0-${data.queries.length - 1}. Available queries: ${available || "none"}. Use one of the available indexes.`, { error: "Index out of range" });
 					}
 				} else {
 					const available = data.queries.map((q, i) => `${i}: "${q.query}"`).join(", ");
-					return {
-						content: [{ type: "text", text: `Specify query or queryIndex for responseId ${formatInputValue(params.responseId)}. Available queries: ${available || "none"}.` }],
-						details: { error: "No query specified" },
-					};
+					return errorResult(`Specify query or queryIndex for responseId ${formatInputValue(params.responseId)}. Available queries: ${available || "none"}.`, { error: "No query specified" });
 				}
 
 				if (queryData.error) {
-					return {
-						content: [{ type: "text", text: `Error retrieving query ${formatInputValue(queryData.query)} from responseId ${formatInputValue(params.responseId)}: ${queryData.error}. Check the stored search result and retry with another query or queryIndex if needed.` }],
-						details: { error: queryData.error, query: queryData.query },
-					};
+					return errorResult(`Error retrieving query ${formatInputValue(queryData.query)} from responseId ${formatInputValue(params.responseId)}: ${queryData.error}. Check the stored search result and retry with another query or queryIndex if needed.`, { error: queryData.error, query: queryData.query });
 				}
 
 				const fullResults = formatFullResults(queryData);
@@ -3026,32 +2979,20 @@ export default function (pi: ExtensionAPI) {
 						};
 					} catch (err) {
 						const error = err instanceof Error ? err.message : String(err);
-						return {
-							content: [{ type: "text", text: `Unable to find ${formatInputValue(params.findText)} in query ${formatInputValue(queryData.query)} for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.` }],
-							details: { error, query: queryData.query },
-						};
+						return errorResult(`Unable to find ${formatInputValue(params.findText)} in query ${formatInputValue(queryData.query)} for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.`, { error, query: queryData.query });
 					}
 				}
 
 				const offset = params.offset ?? 0;
 				const limit = params.limit ?? maxInlineContentChars;
 				if (!Number.isInteger(offset) || offset < 0) {
-					return {
-						content: [{ type: "text", text: `Invalid offset: received ${formatInputValue(offset)} for query ${formatInputValue(queryData.query)}; offset must be a non-negative integer. Use 0 or a larger integer.` }],
-						details: { error: "Invalid offset", offset },
-					};
+					return errorResult(`Invalid offset: received ${formatInputValue(offset)} for query ${formatInputValue(queryData.query)}; offset must be a non-negative integer. Use 0 or a larger integer.`, { error: "Invalid offset", offset });
 				}
 				if (!Number.isInteger(limit) || limit <= 0 || limit > maxInlineContentChars) {
-					return {
-						content: [{ type: "text", text: `Invalid limit: received ${formatInputValue(limit)} for query ${formatInputValue(queryData.query)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.` }],
-						details: { error: "Invalid limit", limit, maxLimit: maxInlineContentChars },
-					};
+					return errorResult(`Invalid limit: received ${formatInputValue(limit)} for query ${formatInputValue(queryData.query)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.`, { error: "Invalid limit", limit, maxLimit: maxInlineContentChars });
 				}
 				if (offset > fullResults.length) {
-					return {
-						content: [{ type: "text", text: `Offset ${offset} is out of range for query ${formatInputValue(queryData.query)} in responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${fullResults.length}. Use an offset within that range.` }],
-						details: { error: "Offset out of range", offset, contentLength: fullResults.length },
-					};
+					return errorResult(`Offset ${offset} is out of range for query ${formatInputValue(queryData.query)} in responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${fullResults.length}. Use an offset within that range.`, { error: "Offset out of range", offset, contentLength: fullResults.length });
 				}
 				const queryIndex = data.queries.indexOf(queryData);
 				let returnedChars = Math.min(limit, fullResults.length - offset);
@@ -3092,34 +3033,22 @@ export default function (pi: ExtensionAPI) {
 					urlData = data.urls[selectedUrlIndex];
 					if (!urlData) {
 						const available = data.urls.map((u) => u.url).join("\n  ");
-						return {
-							content: [{ type: "text", text: `URL ${formatInputValue(params.url)} was not found for responseId ${formatInputValue(params.responseId)}. Received url=${formatInputValue(params.url)}. Available URLs:\n  ${available || "  none"}\nUse one of the available URLs or urlIndex.` }],
-							details: { error: "URL not found" },
-						};
+						return errorResult(`URL ${formatInputValue(params.url)} was not found for responseId ${formatInputValue(params.responseId)}. Received url=${formatInputValue(params.url)}. Available URLs:\n  ${available || "  none"}\nUse one of the available URLs or urlIndex.`, { error: "URL not found" });
 					}
 				} else if (params.urlIndex !== undefined) {
 					selectedUrlIndex = params.urlIndex;
 					urlData = data.urls[selectedUrlIndex];
 					if (!urlData) {
 						const available = data.urls.map((u, i) => `${i}: ${u.url}`).join("\n  ");
-						return {
-							content: [{ type: "text", text: `URL index ${formatInputValue(params.urlIndex)} is out of range for responseId ${formatInputValue(params.responseId)}. Received urlIndex=${formatInputValue(params.urlIndex)}; valid indexes are 0-${data.urls.length - 1}. Available URLs:\n  ${available || "  none"}\nUse one of the available indexes.` }],
-							details: { error: "Index out of range" },
-						};
+						return errorResult(`URL index ${formatInputValue(params.urlIndex)} is out of range for responseId ${formatInputValue(params.responseId)}. Received urlIndex=${formatInputValue(params.urlIndex)}; valid indexes are 0-${data.urls.length - 1}. Available URLs:\n  ${available || "  none"}\nUse one of the available indexes.`, { error: "Index out of range" });
 					}
 				} else {
 					const available = data.urls.map((u, i) => `${i}: ${u.url}`).join("\n  ");
-					return {
-						content: [{ type: "text", text: `Specify url or urlIndex for responseId ${formatInputValue(params.responseId)}. Available URLs:\n  ${available || "  none"}` }],
-						details: { error: "No URL specified" },
-					};
+					return errorResult(`Specify url or urlIndex for responseId ${formatInputValue(params.responseId)}. Available URLs:\n  ${available || "  none"}`, { error: "No URL specified" });
 				}
 
 				if (urlData.error) {
-					return {
-						content: [{ type: "text", text: `Error retrieving URL ${formatInputValue(urlData.url)} from responseId ${formatInputValue(params.responseId)}: ${urlData.error}. Check the stored fetch result and retry with another URL or urlIndex if needed.` }],
-						details: { error: urlData.error, url: urlData.url },
-					};
+					return errorResult(`Error retrieving URL ${formatInputValue(urlData.url)} from responseId ${formatInputValue(params.responseId)}: ${urlData.error}. Check the stored fetch result and retry with another URL or urlIndex if needed.`, { error: urlData.error, url: urlData.url });
 				}
 
 				if (params.findText !== undefined) {
@@ -3132,32 +3061,20 @@ export default function (pi: ExtensionAPI) {
 						};
 					} catch (err) {
 						const error = err instanceof Error ? err.message : String(err);
-						return {
-							content: [{ type: "text", text: `Unable to find ${formatInputValue(params.findText)} in URL ${formatInputValue(urlData.url)} for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.` }],
-							details: { error, url: urlData.url },
-						};
+						return errorResult(`Unable to find ${formatInputValue(params.findText)} in URL ${formatInputValue(urlData.url)} for responseId ${formatInputValue(params.responseId)}: ${error}. Check findText and use a supported findMode.`, { error, url: urlData.url });
 					}
 				}
 
 				const offset = params.offset ?? 0;
 				const limit = params.limit ?? maxInlineContentChars;
 				if (!Number.isInteger(offset) || offset < 0) {
-					return {
-						content: [{ type: "text", text: `Invalid offset: received ${formatInputValue(offset)} for URL ${formatInputValue(urlData.url)}; offset must be a non-negative integer. Use 0 or a larger integer.` }],
-						details: { error: "Invalid offset", offset },
-					};
+					return errorResult(`Invalid offset: received ${formatInputValue(offset)} for URL ${formatInputValue(urlData.url)}; offset must be a non-negative integer. Use 0 or a larger integer.`, { error: "Invalid offset", offset });
 				}
 				if (!Number.isInteger(limit) || limit <= 0 || limit > maxInlineContentChars) {
-					return {
-						content: [{ type: "text", text: `Invalid limit: received ${formatInputValue(limit)} for URL ${formatInputValue(urlData.url)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.` }],
-						details: { error: "Invalid limit", limit, maxLimit: maxInlineContentChars },
-					};
+					return errorResult(`Invalid limit: received ${formatInputValue(limit)} for URL ${formatInputValue(urlData.url)}; limit must be an integer from 1 to ${maxInlineContentChars}. Use a value in that range.`, { error: "Invalid limit", limit, maxLimit: maxInlineContentChars });
 				}
 				if (offset > urlData.content.length) {
-					return {
-						content: [{ type: "text", text: `Offset ${offset} is out of range for URL ${formatInputValue(urlData.url)} in responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${urlData.content.length}. Use an offset within that range.` }],
-						details: { error: "Offset out of range", offset, contentLength: urlData.content.length },
-					};
+					return errorResult(`Offset ${offset} is out of range for URL ${formatInputValue(urlData.url)} in responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${urlData.content.length}. Use an offset within that range.`, { error: "Offset out of range", offset, contentLength: urlData.content.length });
 				}
 
 				const endOffset = Math.min(offset + limit, urlData.content.length);
@@ -3186,10 +3103,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			return {
-				content: [{ type: "text", text: `Invalid stored data for responseId ${formatInputValue(params.responseId)}: received type ${formatInputValue(data.type)}. Use a responseId returned by ${storedContentSources}.` }],
-				details: { error: "Invalid data" },
-			};
+			return errorResult(`Invalid stored data for responseId ${formatInputValue(params.responseId)}: received type ${formatInputValue(data.type)}. Use a responseId returned by ${storedContentSources}.`, { error: "Invalid data" });
 		},
 
 		renderCall(args, theme) {

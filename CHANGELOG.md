@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Every error a tool returns to the model now carries `isError: true`, so Pi marks the call as failed instead of a success that happens to start with "Error:". Providers that support error tool results, such as Anthropic, forward the flag, which helps models correct their arguments instead of retrying them unchanged — for example a model that keeps omitting `url` on `fetch_content`. Message texts and `details` stay as they were, and Pi versions before 1.0 simply ignore the flag. `fetch_content` without a URL now also names the parameters to use, like `web_search` already did.
+
 ### Fixed
 
 - `web_search` accepts `provider`, `queries`, and `domainFilter` arrays that a model sent as a JSON string, such as `provider: "[\"parallel-mcp\"]"`. They failed schema validation before the search ran. Thanks to [@advaitpaliwal](https://github.com/advaitpaliwal) for [PR #491](https://github.com/nicobailon/pi-web-access/pull/491).
