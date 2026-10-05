@@ -3,7 +3,6 @@ import { Box, Text, truncateToWidth, type KeyId } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { ExtractedContent } from "./extract.ts";
 import { normalizeFetchContentParams } from "./fetch-params.ts";
-import { errorResult } from "./error-result.ts";
 import { answerFromPage } from "./page-query.ts";
 import { rewriteSearchQuery } from "./query-rewrite.ts";
 import { clearCloneCache } from "./github-extract.ts";
@@ -85,6 +84,7 @@ import {
 	getMaxInlineContentChars,
 	isToolEnabled,
 	loadConfig,
+	markToolError,
 	normalizeProviderInput,
 	normalizeQueryList,
 	normalizeRecencyFilter,
@@ -1352,7 +1352,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 
 		async execute(callId, params, signal, onUpdate, ctx) {
-			return runWithProxy(typeof params.proxy === "string" ? params.proxy : undefined, async () => {
+			return markToolError(await runWithProxy(typeof params.proxy === "string" ? params.proxy : undefined, async () => {
 				const rawQueryList: unknown[] = Array.isArray(params.queries)
 					? params.queries
 					: (params.query !== undefined ? expandQueryString(params.query) : []);
@@ -1363,11 +1363,17 @@ export default function (pi: ExtensionAPI) {
 				const recencyFilter = normalizeRecencyFilter(params.recencyFilter);
 
 				if (queryList.length === 0) {
-					return errorResult("Error: No query provided. Use 'query' or 'queries' parameter.", { error: "No query provided" });
+					return {
+						content: [{ type: "text", text: "Error: No query provided. Use 'query' or 'queries' parameter." }],
+						details: { error: "No query provided" },
+					};
 				}
 
 				if (shouldCurate && !ctx) {
-					return errorResult("Error: Curation requires an active extension context.", { error: "Missing extension context" });
+					return {
+						content: [{ type: "text", text: "Error: Curation requires an active extension context." }],
+						details: { error: "Missing extension context" },
+					};
 				}
 
 				if (shouldCurate) {
@@ -1569,7 +1575,10 @@ export default function (pi: ExtensionAPI) {
 			if (workflow === "auto-summary") {
 				summarize = async (searchResults) => {
 					if (!ctx) {
-						return errorResult("Error: Auto-summary requires an active extension context.", { error: "Missing extension context" });
+						return {
+							content: [{ type: "text", text: "Error: Auto-summary requires an active extension context." }],
+							details: { error: "Missing extension context" },
+						};
 					}
 					onUpdate?.({
 						content: [{ type: "text", text: "Generating summary..." }],
@@ -1596,7 +1605,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 			return core.webSearch(params, signal, { extensionContext: ctx, onUpdate, summarize });
-			});
+			}));
 		},
 
 		renderCall(args, theme) {
@@ -1871,7 +1880,7 @@ export default function (pi: ExtensionAPI) {
 			})),
 		}),
 		async execute(_callId, params, signal, _onUpdate, ctx) {
-			return core.sourceCheck(params, signal, { extensionContext: ctx });
+			return markToolError(await core.sourceCheck(params, signal, { extensionContext: ctx }));
 		},
 	});
 
@@ -1920,7 +1929,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx): Promise<AgentToolResult<Record<string, unknown>>> {
-			return core.fetchContent(params, signal, { extensionContext: ctx, onUpdate });
+			return markToolError(await core.fetchContent(params, signal, { extensionContext: ctx, onUpdate }));
 		},
 
 		renderCall(args, theme) {
@@ -2084,7 +2093,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 
 		async execute(_toolCallId, rawParams): Promise<AgentToolResult<Record<string, unknown>>> {
-			return core.getSearchContent(rawParams);
+			return markToolError(await core.getSearchContent(rawParams));
 		},
 
 		renderCall(args, theme) {

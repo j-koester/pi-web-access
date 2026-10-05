@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Perplexity `web_search` results now come from Perplexity's Search API, so each result carries a real page snippet instead of an empty one, and searches cost less ($1 per 1K fast searches, no token billing). Results no longer include a Sonar-written answer; YouTube summaries still use Sonar. Thanks to [@DWalland](https://github.com/DWalland) for [issue #512](https://github.com/nicobailon/pi-web-access/issues/512).
-- Every error a tool returns to the model now carries `isError: true`, so Pi marks the call as failed instead of a success that happens to start with "Error:". Providers that support error tool results, such as Anthropic, forward the flag, which helps models correct their arguments instead of retrying them unchanged — for example a model that keeps omitting `url` on `fetch_content`. The same applies to the MCP server, which reports the failures to Claude Code, Codex, and Cursor. Message texts and `details` stay as they were, and Pi versions before 1.0 simply ignore the flag. `fetch_content` without a URL now also names the parameters to use, like `web_search` already did.
+- Failed tool calls now carry `isError: true` in Pi and over MCP. This covers invalid arguments and calls where nothing succeeded, such as a `web_search` or `source_check` where every search failed. Pi versions before 1.0 ignore the flag. `fetch_content` without a URL now also names the parameters to use, like `web_search` already did. Other message texts and `details` are unchanged. Thanks to [@j-koester](https://github.com/j-koester) for [PR #514](https://github.com/nicobailon/pi-web-access/pull/514).
 
 ## [0.36.0] - 2026-10-04
 

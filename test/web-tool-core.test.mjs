@@ -198,7 +198,7 @@ test("standalone validation failures are flagged as errors before any network ca
 		};
 	`);
 	assert.deepEqual(requests, []);
-	// The shared error helper must not pull in the Pi runtime.
+	// Validation failures must not pull in the Pi runtime.
 	assert.deepEqual(blocked, []);
 	for (const result of Object.values(out)) {
 		assert.equal(result.isError, true);
